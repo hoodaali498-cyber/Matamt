@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دليل المطاعم التفاعلي</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root { --primary: #ff4757; --dark: #2f3542; --bg: #f1f2f6; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { text-align: center; padding: 30px 0; }
+        
+        /* تصميم شبكة المطاعم */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 30px; border-radius: 25px; text-align: center; cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
+        .card:hover { transform: translateY(-10px); background: var(--primary); color: white; }
+        .card i { font-size: 50px; color: var(--primary); margin-bottom: 15px; }
+        .card:hover i { color: white; }
+
+        /* صفحة التفاصيل والمنيو */
+        #menu-page { display: none; background: white; padding: 30px; border-radius: 30px; min-height: 90vh; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .back-btn { display: inline-block; padding: 10px 25px; background: var(--dark); color: white; border-radius: 50px; cursor: pointer; margin-bottom: 20px; }
+        .menu-list { margin-top: 20px; }
+        .item { display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px dashed #ddd; }
+
+        /* قسم التقييمات */
+        .rating-section { margin-top: 40px; background: #f9f9f9; padding: 25px; border-radius: 20px; }
+        .stars i { font-size: 30px; color: #ccc; cursor: pointer; transition: 0.2s; }
+        .stars i.active { color: #ffa502; }
+        textarea { width: 100%; margin-top: 15px; padding: 15px; border-radius: 15px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; font-size: 16px; }
+        .send-btn { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 12px; cursor: pointer; margin-top: 15px; font-weight: bold; width: 100%; }
+        .review-card { background: white; padding: 15px; border-radius: 12px; margin-top: 15px; border-right: 6px solid var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        #allReviews { margin-bottom: 20px; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="home-page">
+        <header>
+            <h1>دليل مطاعم المدينة</h1>
+            <p>اختر مطعماً لاستعراض المنيو والتقييمات</p>
+        </header>
+        <div class="grid">
+            <div class="card" onclick="openMenu('بيتزا هت', [['بيتزا مارغريتا', '12$'], ['بيتزا رانش', '15$'], ['بيبسي', '2$']])">
+                <i class="fas fa-pizza-slice"></i><h3>بيتزا هت</h3>
+            </div>
+            <div class="card" onclick="openMenu('برجر كينج', [['وجبة وابر', '10$'], ['تشيز برجر', '7$'], ['بطاطس', '3$']])">
+                <i class="fas fa-hamburger"></i><h3>برجر كينج</h3>
+            </div>
+            <div class="card" onclick="openMenu('ستاربكس', [['كابتشينو', '6$'], ['لاتيه', '7$'], ['كيك شوكولاتة', '5$']])">
+                <i class="fas fa-coffee"></i><h3>ستاربكس</h3>
+            </div>
+        </div>
+    </div>
+
+    <div id="menu-page">
+        <div class="back-btn" onclick="goHome()"><i class="fas fa-arrow-right"></i> رجوع</div>
+        <h2 id="restaurantName"></h2>
+        <div id="menuItems" class="menu-list"></div>
+
+        <div class="rating-section">
+            <h3>آراء الزبائن</h3>
+            <div id="allReviews">جاري تحميل التعليقات...</div>
+            
+            <hr>
+            <h3>أضف رأيك الخاص</h3>
+            <div class="stars" id="starsGroup">
+                <i class="fas fa-star" onclick="setStar(1)"></i>
+                <i class="fas fa-star" onclick="setStar(2)"></i>
+                <i class="fas fa-star" onclick="setStar(3)"></i>
+                <i class="fas fa-star" onclick="setStar(4)"></i>
+                <i class="fas fa-star" onclick="setStar(5)"></i>
+            </div>
+            <textarea id="reviewText" rows="3" placeholder="ما هو رأيك في الخدمة والطعام؟"></textarea>
+            <button class="send-btn" onclick="sendReview()">إرسال التقييم</button>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // إعدادات مشروعك التي أرسلتها
+    const firebaseConfig = {
+        apiKey: "AIzaSyCsVP94MBH-gi-c_DsVmQ187oWbI8ARoF0",
+        authDomain: "star-9d09c.firebaseapp.com",
+        projectId: "star-9d09c",
+        storageBucket: "star-9d09c.firebasestorage.app",
+        messagingSenderId: "227777582485",
+        appId: "1:227777582485:web:49e3ddb995f4338303d29c",
+        measurementId: "G-BTXD89FF81"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let activeRes = "";
+    let starsValue = 0;
+
+    // وظيفة فتح المنيو
+    window.openMenu = (name, items) => {
+        activeRes = name;
+        document.getElementById('home-page').style.display = 'none';
+        document.getElementById('menu-page').style.display = 'block';
+        document.getElementById('restaurantName').innerText = "قائمة " + name;
+        
+        let html = "";
+        items.forEach(i => { html += `<div class="item"><span>${i[0]}</span><b>${i[1]}</b></div>`; });
+        document.getElementById('menuItems').innerHTML = html;
+        listenToReviews();
+    };
+
+    // العودة للرئيسية
+    window.goHome = () => {
+        document.getElementById('menu-page').style.display = 'none';
+        document.getElementById('home-page').style.display = 'block';
+    };
+
+    // اختيار النجوم
+    window.setStar = (n) => {
+        starsValue = n;
+        document.querySelectorAll('#starsGroup i').forEach((s, i) => {
+            s.classList.toggle('active', i < n);
+        });
+    };
+
+    // إرسال التقييم إلى Firebase
+    window.sendReview = async () => {
+        const text = document.getElementById('reviewText').value;
+        if(starsValue === 0) return alert("يرجى اختيار عدد النجوم أولاً");
+        
+        try {
+            await addDoc(collection(db, "restaurant_reviews"), {
+                resName: activeRes,
+                rating: starsValue,
+                comment: text,
+                time: new Date()
+            });
+            alert("تم إرسال تقييمك بنجاح!");
+            document.getElementById('reviewText').value = "";
+            setStar(0);
+        } catch(e) {
+            console.error(e);
+            alert("فشل الإرسال! تأكد من ضبط Rules في Firebase على true");
+        }
+    };
+
+    // جلب التعليقات وعرضها فوراً (Real-time)
+    function listenToReviews() {
+        const reviewsRef = collection(db, "restaurant_reviews");
+        // قراءة مستمرة للتغيرات
+        onSnapshot(reviewsRef, (snapshot) => {
+            const list = document.getElementById('allReviews');
+            if (snapshot.empty) {
+                list.innerHTML = "<p>لا توجد تعليقات بعد لهذا المطعم.</p>";
+                return;
+            }
+            list.innerHTML = "";
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // عرض تعليقات المطعم المختار فقط
+                if (data.resName === activeRes) {
+                    list.innerHTML += `
+                        <div class="review-card">
+                            <div style="color:#ffa502">${'★'.repeat(data.rating)}${'☆'.repeat(5-data.rating)}</div>
+                            <p>${data.comment || "بدون تعليق مكتوب"}</p>
+                        </div>`;
+                }
+            });
+            if(list.innerHTML === "") list.innerHTML = "<p>لا توجد تعليقات لهذا المطعم بعد.</p>";
+        });
+    }
+</script>
+
+</body>
+</html>
